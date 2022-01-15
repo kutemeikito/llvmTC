@@ -46,20 +46,18 @@ builder_commit="$(git rev-parse HEAD)"
 # Send a notificaton to TG
 tg_post_msg "<b>$LLVM_NAME: Toolchain Compilation Started</b>%0A<b>Date : </b><code>$rel_friendly_date</code>%0A<b>Toolchain Script Commit : </b><code>$builder_commit</code>%0A"
 
-# Build LLVM
-msg "$LLVM_NAME: Building LLVM..."
-tg_post_msg "<b>$LLVM_NAME: Building LLVM. . .</b>"
-TomTal=$(nproc)
-if [[ ! -z "${2}" ]];then
-    TomTal=$(($TomTal*2))
-fi
+## Build LLVM
+msg "Building LLVM..."
+tg_post_msg "<code>Building LLVM</code>"
 ./build-llvm.py \
-	--clang-vendor "$LLVM_NAME" \
-	--targets "ARM;AArch64" \
-	--defines "LLVM_PARALLEL_COMPILE_JOBS=$TomTal LLVM_PARALLEL_LINK_JOBS=$TomTal CMAKE_C_FLAGS='-g0 -O3' CMAKE_CXX_FLAGS='-g0 -O3'" \
+	--clang-vendor "RastaMod69" \
+	--defines "LLVM_PARALLEL_COMPILE_JOBS=$(nproc) LLVM_PARALLEL_LINK_JOBS=$(nproc) CMAKE_C_FLAGS=-O3 CMAKE_CXX_FLAGS=-O3" \
+	--incremental \
+	--lto full \
+	--projects "clang;lld;polly" \
+	--pgo kernel-defconfig \
 	--shallow-clone \
-	--no-ccache \
-	--branch "main" 2>&1 | tee build.log
+	--targets "ARM;AArch64;X86" 2>&1 | tee build.log
 
 # Check if the final clang binary exists or not.
 [ ! -f install/bin/clang-1* ] && {
