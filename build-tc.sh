@@ -1,14 +1,5 @@
 #!/usr/bin/env bash
 
-# Secret Variable for CI
-# LLVM_NAME | Your desired Toolchain Name
-# TG_TOKEN | Your Telegram Bot Token
-# TG_CHAT_ID | Your Telegram Channel / Group Chat ID
-# GH_USERNAME | Your Github Username
-# GH_EMAIL | Your Github Email
-# GH_TOKEN | Your Github Token ( repo & repo_hook )
-# GH_PUSH_REPO_URL | Your Repository for store compiled Toolchain ( without https:// or www. ) ex. github.com/xyz-prjkt/xRageTC.git
-
 # Function to show an informational message
 msg() {
     echo -e "\e[1;32m$*\e[0m"
@@ -18,21 +9,22 @@ err() {
     echo -e "\e[1;41m$*\e[0m"
 }
 
+
 # Set a directory
 DIR="$(pwd ...)"
 
 # Inlined function to post a message
-export BOT_MSG_URL="https://api.telegram.org/bot$TG_TOKEN/sendMessage"
+export BOT_MSG_URL="https://api.telegram.org/bot$TOKEN/sendMessage"
 tg_post_msg() {
-	curl -s -X POST "$BOT_MSG_URL" -d chat_id="$TG_CHAT_ID" \
+	curl -s -X POST "$BOT_MSG_URL" -d chat_id="$CHATID" \
 	-d "disable_web_page_preview=true" \
 	-d "parse_mode=html" \
 	-d text="$1"
 
 }
 tg_post_build() {
-	curl --progress-bar -F document=@"$1" "$BOT_MSG_URL" \
-	-F chat_id="$TG_CHAT_ID"  \
+	curl --progress-bar -F document=@"$1" "$BOT_BUILD_URL" \
+	-F chat_id="$2"  \
 	-F "disable_web_page_preview=true" \
 	-F "parse_mode=html" \
 	-F caption="$3"
@@ -44,33 +36,32 @@ rel_friendly_date="$(date "+%B %-d, %Y")" # "Month day, year" format
 builder_commit="$(git rev-parse HEAD)"
 
 # Send a notificaton to TG
-tg_post_msg "<b>$LLVM_NAME: Toolchain Compilation Started</b>%0A<b>Date : </b><code>$rel_friendly_date</code>%0A<b>Toolchain Script Commit : </b><code>$builder_commit</code>%0A"
+tg_post_msg "<b>RastaMod69 Clang Compilation Started</b>%0A<b>Date : </b><code>$rel_friendly_date</code>%0A<b>Toolchain Script Commit : </b><code>$builder_commit</code>%0A"
 
 # Build LLVM
-msg "$LLVM_NAME: Building LLVM..."
-tg_post_msg "<b>$LLVM_NAME: Building LLVM. . .</b>"
-TomTal=$(nproc)
-if [[ ! -z "${2}" ]];then
-    TomTal=$(($TomTal*2))
-fi
+msg "Building LLVM..."
+tg_post_msg "<code>Building LLVM</code>"
 ./build-llvm.py \
-	--clang-vendor "$LLVM_NAME" \
-	--targets "ARM;AArch64" \
-	--defines "LLVM_PARALLEL_COMPILE_JOBS=$TomTal LLVM_PARALLEL_LINK_JOBS=$TomTal CMAKE_C_FLAGS='-g0 -O3' CMAKE_CXX_FLAGS='-g0 -O3'" \
+	--clang-vendor "RastaMod69" \
+	--defines "LLVM_PARALLEL_COMPILE_JOBS=$(nproc) LLVM_PARALLEL_LINK_JOBS=$(nproc) CMAKE_C_FLAGS=-O3 CMAKE_CXX_FLAGS=-O3" \
+	--incremental \
+	--lto thin \
+	--projects "clang;lld;polly;compiler-rt" \
+	--pgo kernel-defconfig \
 	--shallow-clone \
-	--no-ccache \
-	--branch "main" 2>&1 | tee build.log
+	--targets "ARM;AArch64" 2>&1 | tee build.log
+	 
 
 # Check if the final clang binary exists or not.
 [ ! -f install/bin/clang-1* ] && {
 	err "Building LLVM failed ! Kindly check errors !!"
-	tg_post_build "build.log" "$TG_CHAT_ID" "Error Log"
+	tg_post_build "build.log" "$CHATID" "Error Log"
 	exit 1
 }
 
 # Build binutils
-msg "$LLVM_NAME: Building binutils..."
-tg_post_msg "<b>$LLVM_NAME: Building Binutils. . .</b>"
+msg "Building binutils..."
+tg_post_msg "<code>Building Binutils</code>"
 ./build-binutils.py --targets arm aarch64
 
 # Remove unused products
@@ -101,24 +92,34 @@ llvm_commit_url="https://github.com/llvm/llvm-project/commit/$short_llvm_commit"
 binutils_ver="$(ls | grep "^binutils-" | sed "s/binutils-//g")"
 clang_version="$(install/bin/clang --version | head -n1 | cut -d' ' -f4)"
 
-tg_post_msg "<b>$LLVM_NAME: Toolchain compilation Finished</b>%0A<b>Clang Version : </b><code>$clang_version</code>%0A<b>LLVM Commit : </b><code>$llvm_commit_url</code>%0A<b>Binutils Version : </b><code>$binutils_ver</code>"
+tg_post_msg "<b>RastaMod69 clang compilation Finished</b>%0A<b>Clang Version : </b><code>$clang_version</code>%0A<b>LLVM Commit : </b><code>$llvm_commit_url</code>%0A<b>Binutils Version : </b><code>$binutils_ver</code>"
 
 # Push to GitHub
 # Update Git repository
-git config --global user.name $GH_USERNAME
-git config --global user.email $GH_EMAIL
-git clone "https://$GH_USERNAME:$GH_TOKEN@$GH_PUSH_REPO_URL" rel_repo
+git config --global user.name "Edwiin Kusuma Jaya"
+git config --global user.email "kutemeikito0905@gmail.com"
+git clone "https://kutemeikito:$GITLAB_TOKEN@gitlab.com/kutemeikito/rastamod69-clang.git" rel_repo
 pushd rel_repo || exit
 rm -fr ./*
 cp -r ../install/* .
 git checkout README.md # keep this as it's not part of the toolchain itself
 git add .
-git commit -asm "$LLVM_NAME: Bump to $rel_date build
+git commit -asm "Update to $rel_date build
 
 LLVM commit: $llvm_commit_url
 Clang Version: $clang_version
 Binutils version: $binutils_ver
-Builder commit: https://$GH_PUSH_REPO_URL/commit/$builder_commit"
+Builder commit: https://github.com/kutemeikito/tc-build/commit/$builder_commit"
+
+# Downgrade the HTTP version to 1.1
+git config --global http.version HTTP/1.1
+# Increase git buffer size
+git config --global http.postBuffer 55428800
+
 git push -f
 popd || exit
-tg_post_msg "<b>$LLVM_NAME: Toolchain pushed to <code>https://$GH_PUSH_REPO_URL</code></b>"
+
+# Set git buffer to original size
+git config --global http.version HTTP/2
+
+tg_post_msg "<b>Toolchain Compilation Finished and pushed</b>"
