@@ -9,7 +9,6 @@ err() {
     echo -e "\e[1;41m$*\e[0m"
 }
 
-
 # Set a directory
 DIR="$(pwd ...)"
 
@@ -35,20 +34,18 @@ rel_date="$(date "+%Y%m%d")" # ISO 8601 format
 rel_friendly_date="$(date "+%B %-d, %Y")" # "Month day, year" format
 builder_commit="$(git rev-parse HEAD)"
 
-# Send a notificaton to TG
-tg_post_msg "<b>Ancient Clang Compilation Started</b>%0A<b>Date : </b><code>$rel_friendly_date</code>%0A<b>Toolchain Script Commit : </b><code>$builder_commit</code>%0A"
-
 # Build LLVM
 msg "Building LLVM..."
 tg_post_msg "<code>Building LLVM</code>"
 ./build-llvm.py \
-	--clang-vendor "Ancient" \
+	--clang-vendor "RastaMod69" \
 	--defines "LLVM_PARALLEL_COMPILE_JOBS=$(nproc) LLVM_PARALLEL_LINK_JOBS=$(nproc) CMAKE_C_FLAGS=-O3 CMAKE_CXX_FLAGS=-O3" \
 	--incremental \
+	--lto thin \
 	--projects "clang;lld;polly;compiler-rt" \
 	--pgo kernel-defconfig \
 	--shallow-clone \
-	--targets "ARM;AArch64" 2>&1 | tee build.log
+	--targets "ARM;AArch64;X86" 2>&1 | tee build.log
 	 
 
 # Check if the final clang binary exists or not.
@@ -60,8 +57,7 @@ tg_post_msg "<code>Building LLVM</code>"
 
 # Build binutils
 msg "Building binutils..."
-tg_post_msg "<code>Building Binutils</code>"
-./build-binutils.py --targets arm aarch64
+./build-binutils.py --targets arm aarch64 x86_64
 
 # Remove unused products
 rm -fr install/include
@@ -90,35 +86,3 @@ popd || exit
 llvm_commit_url="https://github.com/llvm/llvm-project/commit/$short_llvm_commit"
 binutils_ver="$(ls | grep "^binutils-" | sed "s/binutils-//g")"
 clang_version="$(install/bin/clang --version | head -n1 | cut -d' ' -f4)"
-
-tg_post_msg "<b>Ancient clang compilation Finished</b>%0A<b>Clang Version : </b><code>$clang_version</code>%0A<b>LLVM Commit : </b><code>$llvm_commit_url</code>%0A<b>Binutils Version : </b><code>$binutils_ver</code>"
-
-# Push to GitHub
-# Update Git repository
-git config --global user.name "Edwiin Kusuma Jaya"
-git config --global user.email "kutemeikito0905@gmail.com"
-git clone "https://kutemeikito:$GITLAB_TOKEN@gitlab.com/kutemeikito/rastamod69-clang.git" rel_repo
-pushd rel_repo || exit
-rm -fr ./*
-cp -r ../install/* .
-git checkout README.md # keep this as it's not part of the toolchain itself
-git add .
-git commit -asm "Update to $rel_date build
-
-LLVM commit: $llvm_commit_url
-Clang Version: $clang_version
-Binutils version: $binutils_ver
-Builder commit: https://github.com/kutemeikito/tc-build/commit/$builder_commit"
-
-# Downgrade the HTTP version to 1.1
-git config --global http.version HTTP/1.1
-# Increase git buffer size
-git config --global http.postBuffer 55428800
-
-git push -f
-popd || exit
-
-# Set git buffer to original size
-git config --global http.version HTTP/2
-
-tg_post_msg "<b>Toolchain Compilation Finished and pushed</b>"
