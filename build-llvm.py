@@ -16,10 +16,11 @@ import urllib.request as request
 from urllib.error import URLError
 
 # This is a known good revision of LLVM for building the kernel
-GOOD_REVISION = '4b1fde8a2b681dad2ce0c082a5d6422caa06b0bc'
+GOOD_REVISION = '3b2e605e33bd9017ff2eff1493add07822f9d58b'
 
 
 class Directories:
+
     def __init__(self, build_folder, install_folder, linux_folder, llvm_folder,
                  root_folder):
         self.build_folder = build_folder
@@ -30,6 +31,7 @@ class Directories:
 
 
 class EnvVars:
+
     def __init__(self, cc, cxx, ld):
         self.cc = cc
         self.cxx = cxx
